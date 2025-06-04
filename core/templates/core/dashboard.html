@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    {% if user.is_staff %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a class="btn btn-warning text-dark" href="{% url 'submitted_tasks' %}">
+            📋 Review Submitted Tasks
+        </a>
+        <a href="{% url 'create_task' %}" class="btn btn-success">+ Create Task</a>
+    </div>
+    {% endif %}
+
+    <h3 class="mb-4 text-center text-primary">Your Tasks</h3>
+
+    {% for status, task_list in grouped_tasks.items %}
+        <h4 class="mt-4 text-info">{{ status|title }}</h4>
+        <ul class="list-group mb-4">
+        {% for task in task_list %}
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start flex-column flex-md-row">
+                    <div class="flex-grow-1 pe-md-4">
+                        <h5>{{ task.title }}</h5>
+                        {% if task.description %}
+                            <p class="text-muted">{{ task.description|truncatechars:120 }}</p>
+                        {% endif %}
+                        <p>
+                            <strong>Deadline:</strong> {{ task.deadline|date:"M d, Y H:i" }}
+                            {% if task.deadline and task.deadline < now %}
+                                <span class="text-danger ms-2">⚠ Overdue!</span>
+                            {% endif %}
+                        </p>
+                        {% if user.is_staff %}
+                            <p class="text-secondary"><small>Assigned to: {{ task.assigned_to.username }}</small></p>
+                        {% endif %}
+                        {% if task.review_status == 'REJECTED' %}
+                            <div class="alert alert-danger mt-2">
+                                <strong>Admin Feedback:</strong> {{ task.final_description }}<br>
+                                <a href="{% url 'submit_for_review' task.id %}" class="btn btn-sm btn-outline-danger mt-2">Edit & Resubmit</a>
+                            </div>
+                        {% elif task.review_status == 'VERIFIED' %}
+                            <div class="alert alert-success mt-2">
+                                <strong>Verified by Admin:</strong> {{ task.final_description }}
+                            </div>
+                        {% endif %}
+                        {% if task.changes_description %}
+                            <div class="alert alert-warning mt-2">
+                                <strong>Admin Review Comment:</strong> {{ task.changes_description }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 mt-3 mt-md-0">
+                        {% if not user.is_staff %}
+                            <form method="post" action="{% url 'update_status' task.id %}">
+                                {% csrf_token %}
+                                <div class="input-group input-group-sm">
+                                    <select name="status" class="form-select" {% if task.submitted_for_review %}disabled{% endif %}>
+                                        <option value="PENDING" {% if task.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                                        <option value="IN_PROGRESS" {% if task.status == 'IN_PROGRESS' %}selected{% endif %}>In Progress</option>
+                                        <option value="COMPLETED" {% if task.status == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                                    </select>
+                                    {% if not task.submitted_for_review %}
+                                    <button type="submit" class="btn btn-primary">Update</button>
+                                    {% endif %}
+                                </div>
+                            </form>
+
+                            {% if task.status == 'COMPLETED' and not task.submitted_for_review %}
+                                <a href="{% url 'submit_for_review' task.id %}" class="btn btn-sm btn-warning">Submit for Review</a>
+                            {% elif task.submitted_for_review %}
+                                <span class="text-info">Awaiting admin verification...</span>
+                            {% endif %}
+                        {% endif %}
+
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#comments-{{ task.id }}">
+                            💬 Comments
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Comments Section -->
+                <div class="collapse mt-3" id="comments-{{ task.id }}">
+                    <h6>Comments:</h6>
+                    {% for comment in task.comments.all %}
+                        <div class="border-start ps-3 mb-2">
+                            <strong>{{ comment.author.username }}</strong>: {{ comment.content }}
+                            <small class="text-muted">({{ comment.created_at|date:"Y-m-d H:i" }})</small>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted">No comments yet.</div>
+                    {% endfor %}
+
+                    <!-- Add Comment -->
+                    <form method="post" action="{% url 'add_comment' task.id %}" class="mt-2">
+                        {% csrf_token %}
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="content" class="form-control" placeholder="Add a comment..." required>
+                            <button type="submit" class="btn btn-outline-primary">Post</button>
+                        </div>
+                    </form>
+                </div>
+            </li>
+        {% empty %}
+            <li class="list-group-item">No tasks in this category.</li>
+        {% endfor %}
+        </ul>
+    {% endfor %}
+</div>
+{% endblock %}
