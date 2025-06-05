@@ -16,5 +16,4 @@ urlpatterns = [
     path('tasks/review/<int:task_id>/', views.review_task, name='review_task'),
     path('signup/', views.signup_view, name='signup'),
 
-
 ]
