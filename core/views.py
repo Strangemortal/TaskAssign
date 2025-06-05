@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from .models import Task
+from .models import PendingUser, Task
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -168,43 +168,51 @@ def review_task(request, task_id):
 
 
 
+@staff_member_required
+def pending_users(request):
+    users = PendingUser.objects.all()
+    return render(request, "core/pending_users.html", {"pending_users": users})
+
+
+@staff_member_required
+def approve_user(request, user_id):
+    pending = PendingUser.objects.get(id=user_id)
+    User.objects.create_user(username=pending.username, email=pending.email, password=pending.password)
+    pending.delete()
+    messages.success(request, f"User '{pending.username}' approved.")
+    return redirect("pending_users")
+
+
+@staff_member_required
+def reject_user(request, user_id):
+    pending = PendingUser.objects.get(id=user_id)
+    pending.delete()
+    messages.info(request, f"User '{pending.username}' rejected.")
+    return redirect("pending_users")
 
 def signup_view(request):
     if request.method == "POST":
-        # name = request.POST["name"]
         username = request.POST["username"]
         email = request.POST["email"]
         password = request.POST["password"]
         confirm_password = request.POST["confirm_password"]
-        # role = request.POST['role']
-        user = User.objects.create_user(username=username, email=email, password=password)
-
 
         if password != confirm_password:
             messages.error(request, "Passwords do not match.")
             return render(request, "core/signup.html")
 
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "Username already exists.")
+        if PendingUser.objects.filter(username=username).exists() or User.objects.filter(username=username).exists():
+            messages.error(request, "Username already taken.")
             return render(request, "core/signup.html")
 
-        if User.objects.filter(email=email).exists():
+        if PendingUser.objects.filter(email=email).exists() or User.objects.filter(email=email).exists():
             messages.error(request, "Email already in use.")
             return render(request, "core/signup.html")
 
-        # # Optionally split name
-        # name_parts = name.split(" ", 1)
-        # first_name = name_parts[0]
-        # last_name = name_parts[1] if len(name_parts) > 1 else ""
+        # Save to pending list
+        PendingUser.objects.create(username=username, email=email, password=password)
 
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            # first_name=first_name,
-            # last_name=last_name
-        )
-        login(request, user)
-        return redirect("dashboard")  # or "login" if you want to force re-login
+        messages.success(request, "Account request sent. Waiting for admin approval.")
+        return redirect("login")
 
     return render(request, "core/signup.html")

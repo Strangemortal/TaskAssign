@@ -9,6 +9,9 @@
         <a class="btn btn-warning text-dark" href="{% url 'submitted_tasks' %}">
             📋 Review Submitted Tasks
         </a>
+        <a class="btn btn-outline-danger" href="{% url 'pending_users' %}">
+            👥 Manage Pending Users
+        </a>
         <a href="{% url 'create_task' %}" class="btn btn-success">+ Create Task</a>
     </div>
     {% endif %}
